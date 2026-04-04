@@ -47,16 +47,98 @@ export { getPDAAndBump } from "./lib/pdas";
 // This type is used in the Connection interface and connect function signatures, so it needs to be available in the generated .d.ts files
 export type { RpcTransport } from "@solana/kit";
 
+// ── QuickNode Add-on factories ────────────────────────────────────────────────
 export {
+  // Priority Fee API (FREE)
   getQuickNodePriorityFeesFactory,
+  // Metaplex DAS API (FREE)
   getAssetsByOwnerFactory,
   getAssetFactory,
+  getAssetsByCollectionFactory,
+  searchAssetsFactory,
+  getAssetProofFactory,
+  getWalletTokenAccountsFactory,
+  // OpenOcean V4 Swap API (FREE)
+  getOpenOceanQuoteFactory,
+  getOpenOceanSwapTransactionFactory,
+  OPENOCEAN_TOKENS,
+  // Solana MEV Protection by Merkle (FREE)
+  sendMerkleTransactionFactory,
+  // Solana MEV Resilience by Blink Labs (FREE)
+  sendBlinkLabsTransactionFactory,
+  // Multi-Chain Stablecoin Balance API (PAID)
+  getStablecoinBalancesFactory,
+  // Metis — Jupiter V6 Swap API (PAID)
+  getJupiterSwapQuoteFactory,
+  getJupiterSwapTransactionFactory,
+  getPumpFunSwapTransactionFactory,
+  // Lil' JIT — JITO Bundles & Transactions (PAID)
+  sendJitoTransactionFactory,
+  sendJitoBundleFactory,
+  getBundleStatusesFactory,
+  getInflightBundleStatusesFactory,
+  getJitoTipAccountsFactory,
+  getJitoTipFloorFactory,
+  // Iris Transaction Sender by Astralane (PAID)
+  sendIrisTransactionFactory,
+  // GoldRush — Multichain Data APIs by Covalent (PAID)
+  getGoldRushBalancesFactory,
+  getGoldRushTransactionsFactory,
+  // DeFi Swap Meta-Aggregation by Titan (PAID)
+  getTitanSwapQuoteFactory,
+  subscribeTitanQuotesFactory,
+  // Risk Assessment API by Scorechain (PAID)
+  assessWalletRiskFactory,
 } from "./lib/quicknode";
 export type {
+  // Priority Fee API
   QuickNodePriorityFees,
   QuickNodePriorityFeeOptions,
+  // Metaplex DAS API
   DigitalAsset,
   DigitalAssetContent,
+  AssetsPage,
   GetAssetsByOwnerResult,
   GetAssetsByOwnerOptions,
+  GetAssetsByCollectionOptions,
+  SearchAssetsOptions,
+  AssetProof,
+  GetWalletTokenAccountsOptions,
+  WalletTokenAccount,
+  // OpenOcean V4 Swap API
+  OpenOceanToken,
+  OpenOceanQuoteOptions,
+  OpenOceanQuote,
+  // MEV (shared)
+  MevTxOptions,
+  // Stablecoin Balance API
+  StablecoinBalance,
+  GetStablecoinBalancesOptions,
+  StablecoinBalancesResult,
+  // Metis — Jupiter V6 Swap API
+  JupiterSwapQuote,
+  JupiterSwapRoute,
+  GetJupiterSwapQuoteOptions,
+  PumpFunSwapOptions,
+  // Lil' JIT — Jito Bundles
+  JitoBundleStatus,
+  JitoInflightBundleStatus,
+  JitoTipFloor,
+  // Iris Transaction Sender
+  IrisTxOptions,
+  IrisTxResult,
+  // GoldRush — Multichain Data
+  GoldRushTokenBalance,
+  GoldRushBalancesResult,
+  GoldRushTransaction,
+  GetGoldRushBalancesOptions,
+  GetGoldRushTransactionsOptions,
+  // Titan DeFi Swap Meta-Aggregation
+  TitanSwapQuote,
+  TitanSwapRoute,
+  GetTitanSwapQuoteOptions,
+  // Scorechain Risk Assessment
+  WalletRiskAssessment,
+  RiskFlag,
+  AssessWalletRiskOptions,
 } from "./lib/quicknode";

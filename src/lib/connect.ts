@@ -171,13 +171,23 @@ export const createKitePlugin = (config: KitePluginConfig = {}) => {
       clusterName = "mainnet-beta";
     }
 
+    let supportsGetPriorityFeeEstimate = false;
+    let needsPriorityFees = false;
+    let enableClientSideRetries = false;
+
     // Determine WebSocket URL
     if (webSocketURL) {
       wsUrl = webSocketURL;
     } else if (KNOWN_CLUSTER_NAMES.includes(clusterName)) {
       const clusterDetails = CLUSTERS[clusterName];
-      const { webSocketURL: derivedWsUrl } = getClusterDetailsFromClusterConfig(clusterName, clusterDetails);
+      const {
+        webSocketURL: derivedWsUrl,
+        features,
+      } = getClusterDetailsFromClusterConfig(clusterName, clusterDetails);
       wsUrl = derivedWsUrl;
+      supportsGetPriorityFeeEstimate = features.supportsGetPriorityFeeEstimate;
+      needsPriorityFees = features.needsPriorityFees;
+      enableClientSideRetries = features.enableClientSideRetries;
     } else if (checkIsValidURL(clusterName)) {
       wsUrl = getWebsocketUrlFromHTTPUrl(clusterName);
     } else {
@@ -187,10 +197,6 @@ export const createKitePlugin = (config: KitePluginConfig = {}) => {
     }
 
     rpcSubscriptions = createSolanaRpcSubscriptions(wsUrl);
-
-    const supportsGetPriorityFeeEstimate = false;
-    const needsPriorityFees = false;
-    const enableClientSideRetries = false;
 
     const sendAndConfirmTransaction = sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions } as any);
     const getRecentSignatureConfirmation = createRecentSignatureConfirmationPromiseFactory({ rpc, rpcSubscriptions } as any);

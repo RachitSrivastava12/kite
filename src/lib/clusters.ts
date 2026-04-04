@@ -86,7 +86,8 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
     features: {
       isExplorerDefault: false,
       isNameKnownToSolanaExplorer: false,
-      // TODO: add support for QuickNode priority fee API
+      // QuickNode exposes a separate qn_estimatePriorityFees helper API, but
+      // the core smart-transaction path still uses standard recent fee fallback.
       supportsGetPriorityFeeEstimate: false,
       enableClientSideRetries: true,
       needsPriorityFees: true,
@@ -102,7 +103,8 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
     features: {
       isExplorerDefault: false,
       isNameKnownToSolanaExplorer: false,
-      // TODO: add support for QuickNode priority fee API
+      // QuickNode exposes a separate qn_estimatePriorityFees helper API, but
+      // the core smart-transaction path still uses standard recent fee fallback.
       supportsGetPriorityFeeEstimate: false,
       enableClientSideRetries: true,
       needsPriorityFees: true,
@@ -118,7 +120,8 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
     features: {
       isExplorerDefault: false,
       isNameKnownToSolanaExplorer: false,
-      // TODO: add support for QuickNode priority fee API
+      // QuickNode exposes a separate qn_estimatePriorityFees helper API, but
+      // the core smart-transaction path still uses standard recent fee fallback.
       supportsGetPriorityFeeEstimate: false,
       enableClientSideRetries: true,
       needsPriorityFees: true,
