@@ -1,6 +1,6 @@
 export interface ClusterConfig {
-  // Some RPC providers (ie, QuickNode) use a different URL for each endpoint
-  // Eg, the QuickNode dashboard will show https://three-random-words.solana-devnet.quiknode.pro/some-uuid/
+  // Some RPC providers (ie, Quicknode) use a different URL for each endpoint
+  // Eg, the Quicknode dashboard will show https://three-random-words.solana-devnet.quiknode.pro/some-uuid/
   // In this case, the URLs are null and we will get the from requiredRpcEnvironmentVariable
   httpURL: string | null;
   webSocketURL: string | null;
@@ -20,6 +20,8 @@ export interface ClusterConfig {
     // Whether this cluster supports Helius priority fee estimate instruction
     // See https://docs.helius.dev/solana-apis/priority-fee-api
     supportsGetPriorityFeeEstimate: boolean;
+    // Whether this cluster supports Quicknode's qn_estimatePriorityFees method
+    supportsQNEstimatePriorityFees: boolean;
     // Enable retries on the client side
     enableClientSideRetries: boolean;
     // Whether this cluster needs priority fees
@@ -43,6 +45,7 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
       isExplorerDefault: true,
       isNameKnownToSolanaExplorer: true,
       supportsGetPriorityFeeEstimate: false,
+      supportsQNEstimatePriorityFees: false,
       enableClientSideRetries: true,
       needsPriorityFees: true,
     },
@@ -57,6 +60,7 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
       isExplorerDefault: false,
       isNameKnownToSolanaExplorer: true,
       supportsGetPriorityFeeEstimate: false,
+      supportsQNEstimatePriorityFees: false,
       enableClientSideRetries: true,
       needsPriorityFees: true,
     },
@@ -71,6 +75,7 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
       isExplorerDefault: false,
       isNameKnownToSolanaExplorer: true,
       supportsGetPriorityFeeEstimate: false,
+      supportsQNEstimatePriorityFees: false,
       enableClientSideRetries: true,
       needsPriorityFees: true,
     },
@@ -86,9 +91,8 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
     features: {
       isExplorerDefault: false,
       isNameKnownToSolanaExplorer: false,
-      // QuickNode exposes a separate qn_estimatePriorityFees helper API, but
-      // the core smart-transaction path still uses standard recent fee fallback.
       supportsGetPriorityFeeEstimate: false,
+      supportsQNEstimatePriorityFees: true,
       enableClientSideRetries: true,
       needsPriorityFees: true,
     },
@@ -103,9 +107,8 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
     features: {
       isExplorerDefault: false,
       isNameKnownToSolanaExplorer: false,
-      // QuickNode exposes a separate qn_estimatePriorityFees helper API, but
-      // the core smart-transaction path still uses standard recent fee fallback.
       supportsGetPriorityFeeEstimate: false,
+      supportsQNEstimatePriorityFees: true,
       enableClientSideRetries: true,
       needsPriorityFees: true,
     },
@@ -120,9 +123,8 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
     features: {
       isExplorerDefault: false,
       isNameKnownToSolanaExplorer: false,
-      // QuickNode exposes a separate qn_estimatePriorityFees helper API, but
-      // the core smart-transaction path still uses standard recent fee fallback.
       supportsGetPriorityFeeEstimate: false,
+      supportsQNEstimatePriorityFees: true,
       enableClientSideRetries: true,
       needsPriorityFees: true,
     },
@@ -138,6 +140,7 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
       isExplorerDefault: false,
       isNameKnownToSolanaExplorer: false,
       supportsGetPriorityFeeEstimate: true,
+      supportsQNEstimatePriorityFees: false,
       enableClientSideRetries: true,
       needsPriorityFees: true,
     },
@@ -152,6 +155,7 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
       isExplorerDefault: false,
       isNameKnownToSolanaExplorer: false,
       supportsGetPriorityFeeEstimate: false,
+      supportsQNEstimatePriorityFees: false,
       enableClientSideRetries: true,
       needsPriorityFees: true,
     },
@@ -169,6 +173,7 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
       isExplorerDefault: false,
       isNameKnownToSolanaExplorer: false,
       supportsGetPriorityFeeEstimate: false,
+      supportsQNEstimatePriorityFees: false,
       enableClientSideRetries: true,
       needsPriorityFees: true,
     },
@@ -185,6 +190,7 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
       isExplorerDefault: false,
       isNameKnownToSolanaExplorer: false,
       supportsGetPriorityFeeEstimate: false,
+      supportsQNEstimatePriorityFees: false,
       enableClientSideRetries: true,
       needsPriorityFees: true,
     },
@@ -201,6 +207,7 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
       isExplorerDefault: false,
       isNameKnownToSolanaExplorer: false,
       supportsGetPriorityFeeEstimate: false,
+      supportsQNEstimatePriorityFees: false,
       enableClientSideRetries: true,
       needsPriorityFees: true,
     },
@@ -217,6 +224,7 @@ export const CLUSTERS: Record<string, ClusterConfig> = {
       isExplorerDefault: false,
       isNameKnownToSolanaExplorer: false,
       supportsGetPriorityFeeEstimate: false,
+      supportsQNEstimatePriorityFees: false,
       enableClientSideRetries: false,
       needsPriorityFees: false,
     },

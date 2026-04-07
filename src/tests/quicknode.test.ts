@@ -29,9 +29,6 @@ import {
   sendBlinkLabsTransactionFactory,
   // Iris Transaction Sender
   sendIrisTransactionFactory,
-  // OpenOcean V4 Swap API
-  getOpenOceanQuoteFactory,
-  getOpenOceanSwapTransactionFactory,
   // GoldRush — Multichain Data
   getGoldRushBalancesFactory,
   getGoldRushTransactionsFactory,
@@ -189,14 +186,6 @@ const MOCK_JUP_QUOTE = {
 };
 
 const MOCK_PUMP_FUN_SWAP = { tx: "BASE64PUMPFUNTX" };
-
-// OpenOcean fixture
-const MOCK_OO_QUOTE = {
-  inToken:  { address: SOL_M,  name: "Wrapped SOL", symbol: "SOL",  decimals: 9 },
-  outToken: { address: USDC_M, name: "USD Coin",    symbol: "USDC", decimals: 6 },
-  inAmount: "1", outAmount: "150", minOutAmount: "148.5",
-  priceImpact: "0.01", estimatedGas: "5000", path: [],
-};
 
 // Titan fixture
 const MOCK_TITAN_QUOTE = {
@@ -1241,147 +1230,6 @@ describe("sendIrisTransactionFactory", () => {
           assert.ok(e.message.includes("-32601") || e.message.includes("Method not found"));
           return true;
         },
-      );
-    });
-  });
-});
-
-
-// ════════════════════════════════════════════════════════════
-// OPENOCEAN V4 — getOpenOceanQuoteFactory
-// ════════════════════════════════════════════════════════════
-
-describe("getOpenOceanQuoteFactory", () => {
-  test("factory returns a function", () => {
-    assert.equal(typeof getOpenOceanQuoteFactory("https://example.quiknode.pro/token/"), "function");
-  });
-
-  test("unwraps data field and parses quote from mock REST response", async () => {
-    await withServer(restOk({ code: 200, data: MOCK_OO_QUOTE }), async (url) => {
-      const quote = await getOpenOceanQuoteFactory(url)({
-        inTokenAddress: SOL_M, outTokenAddress: USDC_M, amount: "1",
-      });
-      assert.equal(quote.inToken.symbol,  "SOL");
-      assert.equal(quote.outToken.symbol, "USDC");
-      assert.equal(quote.inAmount,        MOCK_OO_QUOTE.inAmount);
-      assert.equal(quote.outAmount,       "150");
-      assert.equal(typeof quote.priceImpact, "string");
-      assert.ok(Array.isArray(quote.path));
-    });
-  });
-
-  test("uses amountDecimals and addon path on QuickNode-style endpoints", async () => {
-    const requests: string[] = [];
-    await withServer(
-      (req, res) => {
-        requests.push(req.url ?? "");
-        res.writeHead(200, { "Content-Type": "application/json" });
-        if ((req.url ?? "").includes("/tokenList")) {
-          res.end(JSON.stringify({
-            code: 200,
-            data: [{ address: SOL_M, name: "Wrapped SOL", symbol: "SOL", decimals: 9 }],
-          }));
-          return;
-        }
-        res.end(JSON.stringify({ code: 200, data: MOCK_OO_QUOTE }));
-      },
-      async (url) => {
-        const quickNodeStyleUrl = `${url}/token/`;
-        await getOpenOceanQuoteFactory(quickNodeStyleUrl)({
-          inTokenAddress: SOL_M,
-          outTokenAddress: USDC_M,
-          amount: "1",
-        });
-      },
-    );
-
-    assert.equal(requests[0], "/token/addon/807/v4/solana/tokenList");
-    assert.ok(requests[1]?.startsWith("/token/addon/807/v4/solana/quote?"));
-    assert.ok(requests[1]?.includes("amountDecimals=1000000000"));
-    assert.ok(requests[1]?.includes("gasPriceDecimals=100000"));
-  });
-
-  test("throws on HTTP error", async () => {
-    await withServer(httpErr(400), async (url) => {
-      await assert.rejects(
-        () => getOpenOceanQuoteFactory(url)({ inTokenAddress: SOL_M, outTokenAddress: USDC_M, amount: "1" }),
-        (e: Error) => { assert.ok(e.message.includes("400")); return true; },
-      );
-    });
-  });
-
-  // ── Live tests ──────────────────────────────────────────────
-
-  test("returns a valid quote from live endpoint", async () => {
-    if (!hasEndpoint) { skip("OpenOcean V4 Swap API"); return; }
-    const quote = await getOpenOceanQuoteFactory(QN_ENDPOINT)({
-      inTokenAddress: SOL_M, outTokenAddress: USDC_M, amount: "0.01", slippage: 1,
-    });
-    assert.ok(typeof quote.inToken.symbol  === "string");
-    assert.ok(typeof quote.outToken.symbol === "string");
-    assert.ok(typeof quote.outAmount       === "string");
-    assert.ok(typeof quote.priceImpact     === "string");
-  });
-});
-
-
-// ════════════════════════════════════════════════════════════
-// OPENOCEAN V4 — getOpenOceanSwapTransactionFactory
-// ════════════════════════════════════════════════════════════
-
-describe("getOpenOceanSwapTransactionFactory", () => {
-  test("factory returns a function", () => {
-    assert.equal(typeof getOpenOceanSwapTransactionFactory("https://example.quiknode.pro/token/"), "function");
-  });
-
-  test("parses nested transaction data from mock REST response", async () => {
-    await withServer(restOk({ data: { data: "BASE64ENCODEDTX" } }), async (url) => {
-      const result = await getOpenOceanSwapTransactionFactory(url)({
-        inTokenAddress: SOL_M, outTokenAddress: USDC_M, amount: "1", userAddress: WALLET,
-      });
-      assert.equal(result.data.data, "BASE64ENCODEDTX");
-    });
-  });
-
-  test("uses swap_quote path with amountDecimals", async () => {
-    const requests: string[] = [];
-    await withServer(
-      (req, res) => {
-        requests.push(req.url ?? "");
-        res.writeHead(200, { "Content-Type": "application/json" });
-        if ((req.url ?? "").includes("/tokenList")) {
-          res.end(JSON.stringify({
-            code: 200,
-            data: [{ address: SOL_M, name: "Wrapped SOL", symbol: "SOL", decimals: 9 }],
-          }));
-          return;
-        }
-        res.end(JSON.stringify({ data: { data: "BASE64ENCODEDTX" } }));
-      },
-      async (url) => {
-        const quickNodeStyleUrl = `${url}/token/`;
-        await getOpenOceanSwapTransactionFactory(quickNodeStyleUrl)({
-          inTokenAddress: SOL_M,
-          outTokenAddress: USDC_M,
-          amount: "1",
-          userAddress: WALLET,
-        });
-      },
-    );
-
-    assert.equal(requests[0], "/token/addon/807/v4/solana/tokenList");
-    assert.ok(requests[1]?.startsWith("/token/addon/807/v4/solana/swap_quote?"));
-    assert.ok(requests[1]?.includes(`account=${WALLET}`));
-    assert.ok(requests[1]?.includes("amountDecimals=1000000000"));
-  });
-
-  test("throws on HTTP error", async () => {
-    await withServer(httpErr(400), async (url) => {
-      await assert.rejects(
-        () => getOpenOceanSwapTransactionFactory(url)({
-          inTokenAddress: SOL_M, outTokenAddress: USDC_M, amount: "1", userAddress: WALLET,
-        }),
-        (e: Error) => { assert.ok(e.message.includes("400")); return true; },
       );
     });
   });

@@ -1,210 +1,114 @@
 /**
- * QuickNode-specific helpers for Kite
+ * Quicknode-specific helpers for Kite
  *
- * These functions require a QuickNode endpoint with the relevant add-ons enabled.
+ * These functions require a Quicknode endpoint with the relevant add-ons enabled.
  * Get a free endpoint at: https://dashboard.quicknode.com
  *
  * Add-ons used:
- *   - Solana Priority Fee API (FREE)              → getQuickNodePriorityFeesFactory
- *   - Metaplex Digital Asset API / DAS (FREE)     → getAssetsByOwnerFactory, getAssetFactory,
+ *   - Solana Priority Fee API                     → getQuickNodePriorityFeesFactory
+ *   - Metaplex Digital Asset API / DAS            → getAssetsByOwnerFactory, getAssetFactory,
  *                                                    getAssetsByCollectionFactory, searchAssetsFactory,
  *                                                    getAssetProofFactory
- *   - Pump Fun API (FREE)                         → getPumpFunSwapTransactionFactory
- *   - OpenOcean V4 Swap API (FREE)                → getOpenOceanQuoteFactory
- *   - Solana MEV Protection by Merkle (FREE)      → sendMerkleTransactionFactory
- *   - Solana MEV Resilience by Blink Labs (FREE)  → sendBlinkLabsTransactionFactory
- *   - Multi-Chain Stablecoin Balance (PAID)       → getStablecoinBalancesFactory
- *   - Metis - DeFi Swap / Jupiter V6 (PAID)       → getJupiterSwapQuoteFactory
- *   - Lil' JIT - JITO Bundles & Transactions (PAID)→ sendJitoBundleFactory, getBundleStatusesFactory
- *   - Iris Transaction Sender by Astralane (PAID) → sendIrisTransactionFactory
- *   - GoldRush - Multichain Data by Covalent (PAID)→ getGoldRushBalancesFactory,
+ *   - Pump Fun API                                → getPumpFunSwapTransactionFactory
+ *   - OpenOcean V4 Swap API                       → getOpenOceanQuoteFactory
+ *   - Solana MEV Protection by Merkle             → sendMerkleTransactionFactory
+ *   - Solana MEV Resilience by Blink Labs         → sendBlinkLabsTransactionFactory
+ *   - Multi-Chain Stablecoin Balance              → getStablecoinBalancesFactory
+ *   - Metis - DeFi Swap / Jupiter V6              → getJupiterSwapQuoteFactory
+ *   - Lil' JIT - JITO Bundles & Transactions      → sendJitoBundleFactory, getBundleStatusesFactory
+ *   - Iris Transaction Sender by Astralane        → sendIrisTransactionFactory
+ *   - GoldRush - Multichain Data by Covalent      → getGoldRushBalancesFactory,
  *                                                    getGoldRushTransactionsFactory
- *   - DeFi Swap Meta-Aggregation by Titan (PAID)  → getTitanSwapQuoteFactory,
+ *   - DeFi Swap Meta-Aggregation by Titan         → getTitanSwapQuoteFactory,
  *                                                    subscribeTitanQuotesFactory
- *   - Risk Assessment API by Scorechain (PAID)    → assessWalletRiskFactory
+ *   - Risk Assessment API by Scorechain           → assessWalletRiskFactory
  */
+
+export {
+  OPENOCEAN_TOKENS,
+  getOpenOceanQuoteFactory,
+  getOpenOceanSwapTransactionFactory,
+} from "./quicknode/addons/openocean";
+export type {
+  OpenOceanQuote,
+  OpenOceanQuoteOptions,
+  OpenOceanToken,
+} from "./quicknode/addons/openocean";
 
 // ─────────────────────────────────────────────────────────────
 // Internal fetch helpers
 // ─────────────────────────────────────────────────────────────
 
-/** JSON-RPC POST to a QuickNode endpoint */
+const parseJsonResponse = async <T>(res: Response, errorPrefix: string): Promise<T> => {
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`${errorPrefix} ${res.status}: ${text.slice(0, 200)}`);
+  }
+  return JSON.parse(text) as T;
+};
+
+/** JSON-RPC POST to a Quicknode endpoint */
 const rpcFetch = async <T>(
   endpointUrl: string,
-  method: string,
+  rpcMethod: string,
   params: unknown,
 ): Promise<T> => {
   const res = await fetch(endpointUrl, {
-    method:  "POST",
+    method: "POST",
     headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method, params }),
-    signal:  AbortSignal.timeout(30_000),
+    body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method: rpcMethod, params }),
+    signal: AbortSignal.timeout(30_000),
   });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`QuickNode RPC error ${res.status}: ${text.slice(0, 200)}`);
-  }
-  const data = JSON.parse(text) as { result?: T; error?: { code: number; message: string } };
+  const data = await parseJsonResponse<{ result?: T; error?: { code: number; message: string } }>(
+    res,
+    "Quicknode RPC error",
+  );
   if (data.error) {
-    throw new Error(`QuickNode method error ${data.error.code}: ${data.error.message}`);
+    throw new Error(`Quicknode method error ${data.error.code}: ${data.error.message}`);
   }
   return data.result as T;
 };
 
-/** REST GET request to a QuickNode add-on endpoint */
+/** REST GET request to a Quicknode add-on endpoint */
 const restGet = async <T>(url: string): Promise<T> => {
   const res = await fetch(url, {
-    method:  "GET",
+    method: "GET",
     headers: { "Accept": "application/json" },
-    signal:  AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(30_000),
   });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`QuickNode REST error ${res.status}: ${text.slice(0, 200)}`);
-  }
-  return JSON.parse(text) as T;
+  return parseJsonResponse<T>(res, "Quicknode REST error");
 };
 
-/** REST POST request to a QuickNode add-on endpoint */
+/** REST POST request to a Quicknode add-on endpoint */
 const restPost = async <T>(url: string, body: unknown): Promise<T> => {
   const res = await fetch(url, {
-    method:  "POST",
+    method: "POST",
     headers: { "Content-Type": "application/json", "Accept": "application/json" },
-    body:    JSON.stringify(body),
-    signal:  AbortSignal.timeout(30_000),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30_000),
   });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`QuickNode REST error ${res.status}: ${text.slice(0, 200)}`);
-  }
-  return JSON.parse(text) as T;
+  return parseJsonResponse<T>(res, "Quicknode REST error");
 };
 
 /** Strip a trailing slash from a URL */
-const base = (url: string) => url.replace(/\/$/, "");
+const stripTrailingSlash = (url: string) => {
+  const parsedUrl = new URL(url);
+  parsedUrl.pathname = parsedUrl.pathname.replace(/\/$/, "");
+  return parsedUrl.toString().replace(/\/$/, "");
+};
 
-const isQuickNodeRpcUrl = (url: string) => /quiknode\.pro/i.test(url);
+const isQuicknodeRpcUrl = (url: string) => /quiknode\.pro/i.test(url);
 
 const resolveMetisBase = (endpointUrl: string) => {
-  const normalized = base(endpointUrl);
-  return isQuickNodeRpcUrl(normalized) ? "https://public.jupiterapi.com" : normalized;
-};
-
-const resolveOpenOceanBase = (endpointUrl: string) => {
-  const normalized = base(endpointUrl);
-  if (/\/addon\/807\/v4\/solana$/i.test(normalized)) return normalized;
-  if (isQuickNodeRpcUrl(normalized)) return `${normalized}/addon/807/v4/solana`;
-  if (/\/openocean\/v4\/solana$/i.test(normalized)) return normalized;
-  return `${normalized}/openocean/v4/solana`;
-};
-
-const normalizeDecimalAmount = (amount: string, decimals: number): string => {
-  if (!/^\d+(\.\d+)?$/.test(amount)) {
-    throw new Error(`Invalid token amount "${amount}"`);
-  }
-
-  const [whole, fraction = ""] = amount.split(".");
-  if (fraction.length > decimals) {
-    throw new Error(`Amount "${amount}" exceeds token precision of ${decimals} decimals`);
-  }
-
-  const normalizedFraction = fraction.padEnd(decimals, "0");
-  const raw = `${whole}${normalizedFraction}`.replace(/^0+/, "");
-  return raw.length > 0 ? raw : "0";
-};
-
-interface OpenOceanApiToken extends OpenOceanToken {
-  icon?: string;
-}
-
-interface OpenOceanApiQuote {
-  inToken: OpenOceanApiToken;
-  outToken: OpenOceanApiToken;
-  inAmount: string;
-  outAmount: string;
-  minOutAmount: string;
-  price_impact?: string;
-  priceImpact?: string;
-  estimatedGas?: string | number;
-  dexes?: Array<{
-    dexCode: string;
-    route?: Array<{ percent?: number }>;
-  }>;
-}
-
-const openOceanTokenListCache = new Map<string, Promise<Map<string, OpenOceanApiToken>>>();
-
-const getOpenOceanTokenMap = async (endpointUrl: string): Promise<Map<string, OpenOceanApiToken>> => {
-  const openOceanBase = resolveOpenOceanBase(endpointUrl);
-  const cached = openOceanTokenListCache.get(openOceanBase);
-  if (cached) return cached;
-
-  const request = restGet<{ code: number; data: OpenOceanApiToken[] }>(
-    `${openOceanBase}/tokenList`
-  ).then((response) => {
-    const tokens = new Map<string, OpenOceanApiToken>();
-    for (const token of response.data ?? []) {
-      tokens.set(token.address, token);
-    }
-    return tokens;
-  });
-
-  openOceanTokenListCache.set(openOceanBase, request);
-  return request;
-};
-
-const resolveOpenOceanAmountDecimals = async (
-  endpointUrl: string,
-  inTokenAddress: string,
-  options: Pick<OpenOceanQuoteOptions, "amount" | "amountDecimals">
-): Promise<string> => {
-  if (options.amountDecimals !== undefined) {
-    return options.amountDecimals.toString();
-  }
-  if (!options.amount) {
-    throw new Error("OpenOcean requires either amount or amountDecimals");
-  }
-
-  const tokenMap = await getOpenOceanTokenMap(endpointUrl);
-  const token = tokenMap.get(inTokenAddress);
-  if (!token) {
-    throw new Error(`OpenOcean token metadata not found for ${inTokenAddress}`);
-  }
-
-  return normalizeDecimalAmount(options.amount, token.decimals);
-};
-
-const mapOpenOceanQuote = (response: { code: number; data: OpenOceanApiQuote }): OpenOceanQuote => {
-  const quote = response.data;
-  return {
-    inToken: {
-      address: quote.inToken.address,
-      name: quote.inToken.name,
-      symbol: quote.inToken.symbol,
-      decimals: quote.inToken.decimals,
-    },
-    outToken: {
-      address: quote.outToken.address,
-      name: quote.outToken.name,
-      symbol: quote.outToken.symbol,
-      decimals: quote.outToken.decimals,
-    },
-    inAmount: quote.inAmount,
-    outAmount: quote.outAmount,
-    minOutAmount: quote.minOutAmount,
-    priceImpact: quote.price_impact ?? quote.priceImpact ?? "0",
-    estimatedGas: quote.estimatedGas !== undefined ? String(quote.estimatedGas) : "0",
-    path: (quote.dexes ?? []).map((dex) => ({
-      name: dex.dexCode,
-      part: dex.route?.reduce((sum, route) => sum + (route.percent ?? 0), 0) ?? 0,
-    })),
-  };
+  // Strip the trailing slash so we can compare and extend the path consistently.
+  const normalized = stripTrailingSlash(endpointUrl);
+  return isQuicknodeRpcUrl(normalized) ? "https://public.jupiterapi.com" : normalized;
 };
 
 const buildProtectedSendTransactionParams = (options: MevTxOptions) => {
   if (options.tipLamports !== undefined) {
     throw new Error(
-      "QuickNode's Merkle and Blink add-ons use the standard sendTransaction RPC method; include any tip inside the signed transaction itself."
+      "Quicknode's Merkle and Blink add-ons use the standard sendTransaction RPC method; include any tip inside the signed transaction itself."
     );
   }
 
@@ -264,15 +168,15 @@ interface QuickNodePriorityFeesRpcResponse {
 
 /**
  * Creates a function that fetches real-time priority fee recommendations
- * from QuickNode's Priority Fee API.
+ * from Quicknode's Priority Fee API.
  *
  * Returns 5 fee levels (low to extreme) plus a network congestion score,
  * based on recent confirmed transactions on the network.
  *
- * Requires: Solana Priority Fee API add-on (FREE)
+ * Requires: Solana Priority Fee API add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
- * @param endpointUrl - Your QuickNode endpoint URL
+ * @param endpointUrl - Your Quicknode endpoint URL
  * @returns Function to fetch live priority fees
  *
  * @example
@@ -294,7 +198,7 @@ export const getQuickNodePriorityFeesFactory = (endpointUrl: string) => {
   ): Promise<QuickNodePriorityFees> => {
     const params: Record<string, unknown> = {
       last_n_blocks: options.lastNBlocks ?? 100,
-      api_version:   2,
+      api_version: 2,
     };
     if (options.account) {
       params.account = options.account;
@@ -307,11 +211,11 @@ export const getQuickNodePriorityFeesFactory = (endpointUrl: string) => {
     );
 
     return {
-      low:               result.per_compute_unit.low,
-      medium:            result.per_compute_unit.medium,
-      recommended:       result.recommended ?? result.per_compute_unit.recommended ?? result.per_compute_unit.medium,
-      high:              result.per_compute_unit.high,
-      extreme:           result.per_compute_unit.extreme,
+      low: result.per_compute_unit.low,
+      medium: result.per_compute_unit.medium,
+      recommended: result.recommended ?? result.per_compute_unit.recommended ?? result.per_compute_unit.medium,
+      high: result.per_compute_unit.high,
+      extreme: result.per_compute_unit.extreme,
       networkCongestion: result.network_congestion ?? 0,
     };
   };
@@ -436,9 +340,9 @@ export interface GetWalletTokenAccountsOptions {
 
 /**
  * Creates a function that queries all digital assets (NFTs, cNFTs, tokens)
- * owned by a wallet using QuickNode's Metaplex DAS API.
+ * owned by a wallet using Quicknode's Metaplex DAS API.
  *
- * Requires: Metaplex Digital Asset Standard (DAS) API add-on (FREE)
+ * Requires: Metaplex Digital Asset Standard (DAS) API add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -467,7 +371,7 @@ export const getAssetsByOwnerFactory = (endpointUrl: string) => {
  * Creates a function that fetches full details for a single digital asset
  * by its mint address.
  *
- * Requires: Metaplex Digital Asset Standard (DAS) API add-on (FREE)
+ * Requires: Metaplex Digital Asset Standard (DAS) API add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -489,7 +393,7 @@ export const getAssetFactory = (endpointUrl: string) => {
 /**
  * Creates a function that fetches all assets in a collection.
  *
- * Requires: Metaplex Digital Asset Standard (DAS) API add-on (FREE)
+ * Requires: Metaplex Digital Asset Standard (DAS) API add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -507,10 +411,10 @@ export const getAssetsByCollectionFactory = (endpointUrl: string) => {
       endpointUrl,
       "getAssetsByGroup",
       {
-        groupKey:   "collection",
+        groupKey: "collection",
         groupValue: options.collectionMint,
-        limit:      options.limit ?? 100,
-        page:       options.page  ?? 1,
+        limit: options.limit ?? 100,
+        page: options.page ?? 1,
       }
     );
   };
@@ -522,7 +426,7 @@ export const getAssetsByCollectionFactory = (endpointUrl: string) => {
  * Creates a function that searches assets by owner, creator, or collection
  * with optional type filters.
  *
- * Requires: Metaplex Digital Asset Standard (DAS) API add-on (FREE)
+ * Requires: Metaplex Digital Asset Standard (DAS) API add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -539,7 +443,7 @@ export const searchAssetsFactory = (endpointUrl: string) => {
   ): Promise<AssetsPage> => {
     const params: Record<string, unknown> = {
       limit: options.limit ?? 100,
-      page:  options.page  ?? 1,
+      page: options.page ?? 1,
     };
     if (options.ownerAddress)   params.ownerAddress   = options.ownerAddress;
     if (options.creatorAddress) params.creatorAddress = options.creatorAddress;
@@ -557,7 +461,7 @@ export const searchAssetsFactory = (endpointUrl: string) => {
  * Creates a function that returns the Merkle proof for a compressed NFT.
  * Required to verify ownership and build leaf update instructions.
  *
- * Requires: Metaplex Digital Asset Standard (DAS) API add-on (FREE)
+ * Requires: Metaplex Digital Asset Standard (DAS) API add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -708,7 +612,7 @@ export interface GetPumpFunTradesOptions {
 /**
  * Creates a function that fetches the latest pump.fun tokens by launch time.
  *
- * Requires: Pump Fun API add-on (FREE)
+ * Requires: Pump Fun API add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -721,13 +625,13 @@ export const getPumpFunTokensFactory = (endpointUrl: string) => {
     options: GetPumpFunTokensOptions = {}
   ): Promise<PumpFunToken[]> => {
     const qs = new URLSearchParams({
-      limit:  String(options.limit  ?? 20),
+      limit: String(options.limit ?? 20),
       offset: String(options.offset ?? 0),
     });
     if (options.includeNsfw !== undefined) {
       qs.set("include_nsfw", String(options.includeNsfw));
     }
-    return restGet<PumpFunToken[]>(`${base(endpointUrl)}/pump-fun/coins?${qs}`);
+    return restGet<PumpFunToken[]>(`${stripTrailingSlash(endpointUrl)}/pump-fun/coins?${qs}`);
   };
 
   return getPumpFunTokens;
@@ -736,7 +640,7 @@ export const getPumpFunTokensFactory = (endpointUrl: string) => {
 /**
  * Creates a function that fetches a single pump.fun token by its mint address.
  *
- * Requires: Pump Fun API add-on (FREE)
+ * Requires: Pump Fun API add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -746,7 +650,7 @@ export const getPumpFunTokensFactory = (endpointUrl: string) => {
  */
 export const getPumpFunTokenFactory = (endpointUrl: string) => {
   const getPumpFunToken = async (mint: string): Promise<PumpFunToken> => {
-    return restGet<PumpFunToken>(`${base(endpointUrl)}/pump-fun/coins/${mint}`);
+    return restGet<PumpFunToken>(`${stripTrailingSlash(endpointUrl)}/pump-fun/coins/${mint}`);
   };
 
   return getPumpFunToken;
@@ -755,7 +659,7 @@ export const getPumpFunTokenFactory = (endpointUrl: string) => {
 /**
  * Creates a function that fetches all pump.fun tokens created by a specific wallet.
  *
- * Requires: Pump Fun API add-on (FREE)
+ * Requires: Pump Fun API add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -768,10 +672,10 @@ export const getPumpFunTokensByCreatorFactory = (endpointUrl: string) => {
   ): Promise<PumpFunToken[]> => {
     const qs = new URLSearchParams({
       creator: options.creator,
-      limit:   String(options.limit  ?? 20),
-      offset:  String(options.offset ?? 0),
+      limit: String(options.limit ?? 20),
+      offset: String(options.offset ?? 0),
     });
-    return restGet<PumpFunToken[]>(`${base(endpointUrl)}/pump-fun/coins?${qs}`);
+    return restGet<PumpFunToken[]>(`${stripTrailingSlash(endpointUrl)}/pump-fun/coins?${qs}`);
   };
 
   return getPumpFunTokensByCreator;
@@ -780,7 +684,7 @@ export const getPumpFunTokensByCreatorFactory = (endpointUrl: string) => {
 /**
  * Creates a function that fetches the top holders of a pump.fun token.
  *
- * Requires: Pump Fun API add-on (FREE)
+ * Requires: Pump Fun API add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -793,7 +697,7 @@ export const getPumpFunTokenHoldersFactory = (endpointUrl: string) => {
     mint: string
   ): Promise<PumpFunTokenHolder[]> => {
     return restGet<PumpFunTokenHolder[]>(
-      `${base(endpointUrl)}/pump-fun/coins/${mint}/holders`
+      `${stripTrailingSlash(endpointUrl)}/pump-fun/coins/${mint}/holders`
     );
   };
 
@@ -803,7 +707,7 @@ export const getPumpFunTokenHoldersFactory = (endpointUrl: string) => {
 /**
  * Creates a function that fetches recent trades for a pump.fun token.
  *
- * Requires: Pump Fun API add-on (FREE)
+ * Requires: Pump Fun API add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -818,11 +722,11 @@ export const getPumpFunTokenTradesFactory = (endpointUrl: string) => {
   ): Promise<PumpFunTrade[]> => {
     const qs = new URLSearchParams({
       mint,
-      limit:  String(options.limit  ?? 20),
+      limit: String(options.limit ?? 20),
       offset: String(options.offset ?? 0),
     });
     return restGet<PumpFunTrade[]>(
-      `${base(endpointUrl)}/pump-fun/trades/all?${qs}`
+      `${stripTrailingSlash(endpointUrl)}/pump-fun/trades/all?${qs}`
     );
   };
 
@@ -886,7 +790,7 @@ interface StablecoinRpcResponse {
  * Creates a function that queries stablecoin holdings (USDT, USDC, DAI, etc.)
  * for a wallet across 10+ blockchain networks in a single call.
  *
- * Requires: Multi-Chain Stablecoin Balance API add-on (PAID)
+ * Requires: Multi-Chain Stablecoin Balance API add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -984,13 +888,13 @@ export interface PumpFunSwapOptions {
 }
 
 /**
- * Creates a function that fetches a Jupiter V6 swap quote via QuickNode's
+ * Creates a function that fetches a Jupiter V6 swap quote via Quicknode's
  * Metis add-on. Returns route information and expected output amounts.
  *
  * Note: This returns the quote only. To execute the swap, pass the quote
  * response to the `/swap` endpoint along with a signed transaction.
  *
- * Requires: Metis — DeFi Swap Meta-Aggregation API (PAID)
+ * Requires: Metis — DeFi Swap Meta-Aggregation API
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * Useful token addresses:
@@ -1014,9 +918,9 @@ export const getJupiterSwapQuoteFactory = (endpointUrl: string) => {
   ): Promise<JupiterSwapQuote> => {
     const metisBase = resolveMetisBase(endpointUrl);
     const qs = new URLSearchParams({
-      inputMint:   options.inputMint,
-      outputMint:  options.outputMint,
-      amount:      options.amount.toString(),
+      inputMint: options.inputMint,
+      outputMint: options.outputMint,
+      amount: options.amount.toString(),
       slippageBps: String(options.slippageBps ?? 50),
     });
     return restGet<JupiterSwapQuote>(
@@ -1031,7 +935,7 @@ export const getJupiterSwapQuoteFactory = (endpointUrl: string) => {
  * Creates a function that fetches a serialized (unsigned) Jupiter swap transaction.
  * You can sign and send this transaction with your preferred wallet.
  *
- * Requires: Metis — DeFi Swap Meta-Aggregation API (PAID)
+ * Requires: Metis — DeFi Swap Meta-Aggregation API
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -1054,10 +958,10 @@ export const getJupiterSwapTransactionFactory = (endpointUrl: string) => {
     return restPost<{ swapTransaction: string }>(
       `${metisBase}/swap`,
       {
-        quoteResponse:            options.quoteResponse,
-        userPublicKey:            options.userPublicKey,
-        wrapAndUnwrapSol:         options.wrapAndUnwrapSol         ?? true,
-        dynamicComputeUnitLimit:  options.dynamicComputeUnitLimit  ?? true,
+        quoteResponse: options.quoteResponse,
+        userPublicKey: options.userPublicKey,
+        wrapAndUnwrapSol: options.wrapAndUnwrapSol ?? true,
+        dynamicComputeUnitLimit: options.dynamicComputeUnitLimit ?? true,
         prioritizationFeeLamports: options.prioritizationFeeLamports ?? "auto",
       }
     );
@@ -1134,7 +1038,7 @@ export interface JitoTipFloor {
  * a base64 string. The last transaction should include a tip to a Jito
  * tip account (96 SOL tip accounts are available).
  *
- * Requires: Lil' JIT — JITO Bundles & Transactions add-on (PAID)
+ * Requires: Lil' JIT — JITO Bundles & Transactions add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @returns Jito bundle ID (UUID). Use getBundleStatusesFactory to poll status.
@@ -1158,7 +1062,7 @@ export const sendJitoBundleFactory = (endpointUrl: string) => {
 /**
  * Creates a function that polls the status of submitted Jito bundles.
  *
- * Requires: Lil' JIT — JITO Bundles & Transactions add-on (PAID)
+ * Requires: Lil' JIT — JITO Bundles & Transactions add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -1175,8 +1079,8 @@ export const getBundleStatusesFactory = (endpointUrl: string) => {
     }>(endpointUrl, "getBundleStatuses", [bundleIds]);
 
     return (result.value ?? []).map((v) => ({
-      bundleId:   v.bundle_id,
-      status:     v.confirmation_status,
+      bundleId: v.bundle_id,
+      status: v.confirmation_status,
       landedSlot: v.slot,
     }));
   };
@@ -1196,7 +1100,7 @@ export const sendJitoTransactionFactory = (endpointUrl: string) => {
     options: { bundleOnly?: boolean } = {}
   ): Promise<string> => {
     const url = options.bundleOnly
-      ? `${base(endpointUrl)}?bundleOnly=true`
+      ? `${stripTrailingSlash(endpointUrl)}?bundleOnly=true`
       : endpointUrl;
 
     return rpcFetch<string>(url, "sendTransaction", [serializedTransaction]);
@@ -1292,7 +1196,7 @@ export interface MevTxOptions {
  * The transaction must already be signed and serialized to base64.
  * Returns the transaction signature on success.
  *
- * Requires: Solana MEV Protection & Recovery (by Merkle) add-on (FREE)
+ * Requires: Solana MEV Protection & Recovery (by Merkle) add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -1331,7 +1235,7 @@ export const sendMerkleTransactionFactory = (endpointUrl: string) => {
  * The transaction must already be signed and serialized to base64.
  * Returns the transaction signature on success.
  *
- * Requires: Solana MEV Resilience & Recovery (by Blink Labs) add-on (FREE)
+ * Requires: Solana MEV Resilience & Recovery (by Blink Labs) add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -1384,7 +1288,7 @@ export interface IrisTxResult {
  *
  * The transaction must already be signed and serialized to base64.
  *
- * Requires: Iris Transaction Sender (by Astralane) add-on (PAID, ~$249/mo)
+ * Requires: Iris Transaction Sender (by Astralane) add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -1403,158 +1307,14 @@ export const sendIrisTransactionFactory = (endpointUrl: string) => {
       endpointUrl,
       "iris_sendTransaction",
       {
-        transaction:   options.serializedTransaction,
+        transaction: options.serializedTransaction,
         skipPreflight: options.skipPreflight ?? false,
-        maxRetries:    options.maxRetries    ?? 3,
+        maxRetries: options.maxRetries ?? 3,
       }
     );
   };
 
   return sendIrisTransaction;
-};
-
-
-// ─────────────────────────────────────────────────────────────
-// ════════════════════════════════════════════════════════════
-//  OPENOCEAN V4 SWAP API
-// ════════════════════════════════════════════════════════════
-// ─────────────────────────────────────────────────────────────
-
-export interface OpenOceanToken {
-  address:  string;
-  name:     string;
-  symbol:   string;
-  decimals: number;
-}
-
-export interface OpenOceanQuoteOptions {
-  /** Input token mint address */
-  inTokenAddress: string;
-  /** Output token mint address */
-  outTokenAddress: string;
-  /**
-   * Amount in human-readable units.
-   * e.g. "1" for 1 SOL, "100" for 100 USDC
-   */
-  amount?: string;
-  /**
-   * Optional raw amount in smallest units.
-   * Use this when you already know the token decimals and want to avoid
-   * the token-list lookup.
-   */
-  amountDecimals?: string | bigint | number;
-  /** Slippage tolerance in percent. Default: 1 (1%) */
-  slippage?: number;
-}
-
-export interface OpenOceanQuote {
-  inToken:      OpenOceanToken;
-  outToken:     OpenOceanToken;
-  inAmount:     string;
-  outAmount:    string;
-  minOutAmount: string;
-  priceImpact:  string;
-  estimatedGas: string;
-  path:         Array<{ name: string; part: number }>;
-}
-
-/**
- * Token addresses commonly used with OpenOcean on Solana.
- */
-export const OPENOCEAN_TOKENS = {
-  SOL:  "So11111111111111111111111111111111111111112",
-  USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-  BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-} as const;
-
-/**
- * Creates a function that fetches a best-price swap quote from OpenOcean V4,
- * aggregating liquidity across 40+ chains and hundreds of DEXes.
- *
- * Note: Returns a quote only. To execute, call `/openocean/v4/solana/swap_quote`
- * with a `userAddress` to receive a signable transaction.
- *
- * Requires: OpenOcean V4 Swap API add-on (FREE, starting at $0)
- * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
- *
- * @example
- * const getOpenOceanQuote = getOpenOceanQuoteFactory(endpointUrl);
- * const quote = await getOpenOceanQuote({
- *   inTokenAddress:  OPENOCEAN_TOKENS.SOL,
- *   outTokenAddress: OPENOCEAN_TOKENS.USDC,
- *   amount:          "1",   // 1 SOL
- *   slippage:        0.5,   // 0.5%
- * });
- * console.log(`${quote.inAmount} SOL → ${quote.outAmount} USDC`);
- */
-export const getOpenOceanQuoteFactory = (endpointUrl: string) => {
-  const getOpenOceanQuote = async (
-    options: OpenOceanQuoteOptions
-  ): Promise<OpenOceanQuote> => {
-    const openOceanBase = resolveOpenOceanBase(endpointUrl);
-    const amountDecimals = await resolveOpenOceanAmountDecimals(
-      endpointUrl,
-      options.inTokenAddress,
-      options
-    );
-    const qs = new URLSearchParams({
-      inTokenAddress:  options.inTokenAddress,
-      outTokenAddress: options.outTokenAddress,
-      amountDecimals,
-      slippage:        String(options.slippage ?? 1),
-      gasPriceDecimals: "100000",
-    });
-    const res = await restGet<{ code: number; data: OpenOceanApiQuote }>(
-      `${openOceanBase}/quote?${qs}`
-    );
-    return mapOpenOceanQuote(res);
-  };
-
-  return getOpenOceanQuote;
-};
-
-/**
- * Creates a function that fetches a serialized (unsigned) OpenOcean swap transaction.
- * Pass the returned base64 transaction to your wallet for signing and broadcasting.
- *
- * Requires: OpenOcean V4 Swap API add-on (FREE)
- * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
- *
- * @example
- * const getOpenOceanSwapTx = getOpenOceanSwapTransactionFactory(endpointUrl);
- * const { data } = await getOpenOceanSwapTx({
- *   inTokenAddress:  OPENOCEAN_TOKENS.SOL,
- *   outTokenAddress: OPENOCEAN_TOKENS.USDC,
- *   amount:          "1",
- *   userAddress:     "YOUR_WALLET_ADDRESS",
- * });
- * // data.data is a base64-encoded VersionedTransaction ready to sign
- */
-export const getOpenOceanSwapTransactionFactory = (endpointUrl: string) => {
-  const getOpenOceanSwapTransaction = async (
-    options: OpenOceanQuoteOptions & { userAddress: string }
-  ): Promise<{ data: { data: string } }> => {
-    const openOceanBase = resolveOpenOceanBase(endpointUrl);
-    const amountDecimals = await resolveOpenOceanAmountDecimals(
-      endpointUrl,
-      options.inTokenAddress,
-      options
-    );
-    const qs = new URLSearchParams({
-      inTokenAddress:  options.inTokenAddress,
-      outTokenAddress: options.outTokenAddress,
-      amountDecimals,
-      slippage:        String(options.slippage ?? 1),
-      account:         options.userAddress,
-      gasPriceDecimals: "100000",
-    });
-    return restGet<{ data: { data: string } }>(
-      `${openOceanBase}/swap_quote?${qs}`
-    );
-  };
-
-  return getOpenOceanSwapTransaction;
 };
 
 
@@ -1601,7 +1361,7 @@ export interface GetTitanSwapQuoteOptions {
  * from Titan's DeFi meta-aggregation engine, which aggregates across
  * all Solana DEXes via WebSocket streaming.
  *
- * Requires: DeFi Swap Meta-Aggregation API (by Titan) add-on (PAID)
+ * Requires: DeFi Swap Meta-Aggregation API (by Titan) add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -1618,13 +1378,13 @@ export const getTitanSwapQuoteFactory = (endpointUrl: string) => {
     options: GetTitanSwapQuoteOptions
   ): Promise<TitanSwapQuote> => {
     const qs = new URLSearchParams({
-      inputMint:   options.inputMint,
-      outputMint:  options.outputMint,
-      amount:      options.amount,
+      inputMint: options.inputMint,
+      outputMint: options.outputMint,
+      amount: options.amount,
       slippageBps: String(options.slippageBps ?? 50),
     });
     return restGet<TitanSwapQuote>(
-      `${base(endpointUrl)}/titan/v1/quote?${qs}`
+      `${stripTrailingSlash(endpointUrl)}/titan/v1/quote?${qs}`
     );
   };
 
@@ -1637,7 +1397,7 @@ export const getTitanSwapQuoteFactory = (endpointUrl: string) => {
  *
  * Returns an unsubscribe function — call it to close the WebSocket.
  *
- * Requires: DeFi Swap Meta-Aggregation API (by Titan) add-on (PAID)
+ * Requires: DeFi Swap Meta-Aggregation API (by Titan) add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -1661,17 +1421,17 @@ export const subscribeTitanQuotesFactory = (endpointUrl: string) => {
     onQuote:  (quote: TitanSwapQuote) => void,
     onError?: (err: Error) => void
   ): (() => void) => {
-    const wsUrl = base(endpointUrl)
+    const wsUrl = stripTrailingSlash(endpointUrl)
       .replace(/^https?/, "wss" in globalThis ? "wss" : "ws") + "/titan/v1/stream";
 
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       ws.send(JSON.stringify({
-        type:        "subscribe",
-        inputMint:   options.inputMint,
-        outputMint:  options.outputMint,
-        amount:      options.amount,
+        type: "subscribe",
+        inputMint: options.inputMint,
+        outputMint: options.outputMint,
+        amount: options.amount,
         slippageBps: options.slippageBps ?? 50,
       }));
     };
@@ -1795,7 +1555,7 @@ interface GoldRushTransactionsApiResponse {
  * Creates a function that fetches all token and NFT balances for a wallet
  * across any of GoldRush's 100+ supported chains.
  *
- * Requires: GoldRush — Multichain Data APIs (by Covalent) add-on (PAID)
+ * Requires: GoldRush — Multichain Data APIs (by Covalent) add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -1823,7 +1583,7 @@ export const getGoldRushBalancesFactory = (endpointUrl: string) => {
     const query = qs.size ? `?${qs}` : "";
 
     const result = await restGet<GoldRushBalancesApiResponse>(
-      `${base(endpointUrl)}/goldrush/v1/${chain}/address/${options.walletAddress}/balances_v2/${query}`
+      `${stripTrailingSlash(endpointUrl)}/goldrush/v1/${chain}/address/${options.walletAddress}/balances_v2/${query}`
     );
 
     return {
@@ -1850,7 +1610,7 @@ export const getGoldRushBalancesFactory = (endpointUrl: string) => {
  * Creates a function that fetches the full transaction history for a wallet
  * across any of GoldRush's 100+ supported chains, with pagination support.
  *
- * Requires: GoldRush — Multichain Data APIs (by Covalent) add-on (PAID)
+ * Requires: GoldRush — Multichain Data APIs (by Covalent) add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -1872,7 +1632,7 @@ export const getGoldRushTransactionsFactory = (endpointUrl: string) => {
     const query = qs.size ? `?${qs}` : "";
 
     const result = await restGet<GoldRushTransactionsApiResponse>(
-      `${base(endpointUrl)}/goldrush/v1/${chain}/address/${options.walletAddress}/transactions_v3/${query}`
+      `${stripTrailingSlash(endpointUrl)}/goldrush/v1/${chain}/address/${options.walletAddress}/transactions_v3/${query}`
     );
 
     return {
@@ -1938,7 +1698,7 @@ export interface AssessWalletRiskOptions {
  * Returns a risk score (0–100), risk level, AML status, and detailed flags
  * covering sanctions, darknet, exchange categories, and more.
  *
- * Requires: Risk Assessment API (by Scorechain) add-on (PAID, from $50/mo)
+ * Requires: Risk Assessment API (by Scorechain) add-on
  * Enable at: https://dashboard.quicknode.com → your endpoint → Add-ons
  *
  * @example
@@ -1958,7 +1718,7 @@ export const assessWalletRiskFactory = (endpointUrl: string) => {
       network: options.network ?? "solana",
     });
     return restGet<WalletRiskAssessment>(
-      `${base(endpointUrl)}/scorechain/v1/risk?${qs}`
+      `${stripTrailingSlash(endpointUrl)}/scorechain/v1/risk?${qs}`
     );
   };
 

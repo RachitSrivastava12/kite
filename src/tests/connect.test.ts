@@ -9,7 +9,8 @@ import {
 } from "@solana/kit";
 
 import { SOL } from "../lib/constants";
-import { connect, getWebsocketUrlFromHTTPUrl } from "../lib/connect";
+import { connect, getClusterDetailsFromClusterConfig, getWebsocketUrlFromHTTPUrl } from "../lib/connect";
+import { CLUSTERS } from "../lib/clusters";
 
 describe("connect", () => {
   test("connect returns a connection object", () => {
@@ -66,6 +67,13 @@ describe("connect", () => {
     assert.ok(connection);
 
     // Clean up
+    delete process.env.QUICKNODE_SOLANA_MAINNET_ENDPOINT;
+  });
+
+  test("quicknode cluster details enable Quicknode priority fee estimation", () => {
+    process.env.QUICKNODE_SOLANA_MAINNET_ENDPOINT = "https://example.quiknode.pro/123";
+    const details = getClusterDetailsFromClusterConfig("quicknode-mainnet", CLUSTERS["quicknode-mainnet"]);
+    assert.equal(details.features.supportsQNEstimatePriorityFees, true);
     delete process.env.QUICKNODE_SOLANA_MAINNET_ENDPOINT;
   });
 

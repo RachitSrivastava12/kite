@@ -78,6 +78,8 @@ export const sendTransactionFromInstructionsFactory = (
   rpc: ReturnType<typeof createSolanaRpcFromTransport>,
   needsPriorityFees: boolean,
   supportsGetPriorityFeeEstimate: boolean,
+  supportsQNEstimatePriorityFees: boolean,
+  qnEndpointUrl: string | null,
   enableClientSideRetries: boolean,
   sendAndConfirmTransaction: ReturnType<typeof sendAndConfirmTransactionFactory>,
 ) => {
@@ -113,7 +115,14 @@ export const sendTransactionFromInstructionsFactory = (
 
     if (needsPriorityFees) {
       const [priorityFeeEstimate, computeUnitEstimate] = await Promise.all([
-        getPriorityFeeEstimate(rpc, supportsGetPriorityFeeEstimate, transactionMessage, abortSignal),
+        getPriorityFeeEstimate(
+          rpc,
+          supportsGetPriorityFeeEstimate,
+          supportsQNEstimatePriorityFees,
+          qnEndpointUrl,
+          transactionMessage,
+          abortSignal,
+        ),
         getComputeUnitEstimate(rpc, transactionMessage, abortSignal),
       ]);
 

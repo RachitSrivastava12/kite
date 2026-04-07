@@ -80,6 +80,7 @@ export interface ClusterDetails {
   webSocketURL: string;
   features: {
     supportsGetPriorityFeeEstimate: boolean;
+    supportsQNEstimatePriorityFees: boolean;
     needsPriorityFees: boolean;
     enableClientSideRetries: boolean;
     isNameKnownToSolanaExplorer: boolean;
@@ -121,7 +122,7 @@ export const getClusterDetailsFromClusterConfig = (
     };
   }
 
-  // For RPC providers like QuickNode, we need to get the endpoint from an environment variable
+  // For RPC providers like Quicknode, we need to get the endpoint from an environment variable
   const requiredRpcEnvironmentVariable = clusterConfig.requiredRpcEnvironmentVariable;
   if (requiredRpcEnvironmentVariable) {
     const rpcEndpoint = process.env[requiredRpcEnvironmentVariable];
@@ -165,29 +166,26 @@ export const createKitePlugin = (config: KitePluginConfig = {}) => {
     let rpcSubscriptions: RpcSubscriptions<SolanaRpcSubscriptionsApi>;
     let clusterName = clusterNameOrURL;
     let wsUrl: string;
+    let endpointUrl: string | null = null;
+    let clusterFeatures: ClusterDetails["features"] | null = null;
 
     // Postel's law: be liberal in what you accept
     if (clusterName === "mainnet") {
       clusterName = "mainnet-beta";
     }
 
-    let supportsGetPriorityFeeEstimate = false;
-    let needsPriorityFees = false;
-    let enableClientSideRetries = false;
-
     // Determine WebSocket URL
     if (webSocketURL) {
       wsUrl = webSocketURL;
     } else if (KNOWN_CLUSTER_NAMES.includes(clusterName)) {
       const clusterDetails = CLUSTERS[clusterName];
-      const {
-        webSocketURL: derivedWsUrl,
-        features,
-      } = getClusterDetailsFromClusterConfig(clusterName, clusterDetails);
+      const { httpURL, webSocketURL: derivedWsUrl, features } = getClusterDetailsFromClusterConfig(
+        clusterName,
+        clusterDetails,
+      );
+      endpointUrl = httpURL;
       wsUrl = derivedWsUrl;
-      supportsGetPriorityFeeEstimate = features.supportsGetPriorityFeeEstimate;
-      needsPriorityFees = features.needsPriorityFees;
-      enableClientSideRetries = features.enableClientSideRetries;
+      clusterFeatures = features;
     } else if (checkIsValidURL(clusterName)) {
       wsUrl = getWebsocketUrlFromHTTPUrl(clusterName);
     } else {
@@ -204,11 +202,17 @@ export const createKitePlugin = (config: KitePluginConfig = {}) => {
     const createWallet = createWalletFactory(airdropIfRequired);
     const createWallets = createWalletsFactory(createWallet);
     const getLogs = getLogsFactory(rpc);
+    const supportsGetPriorityFeeEstimate = clusterFeatures?.supportsGetPriorityFeeEstimate ?? false;
+    const supportsQNEstimatePriorityFees = clusterFeatures?.supportsQNEstimatePriorityFees ?? false;
+    const needsPriorityFees = clusterFeatures?.needsPriorityFees ?? false;
+    const enableClientSideRetries = clusterFeatures?.enableClientSideRetries ?? false;
 
     const sendTransactionFromInstructions = sendTransactionFromInstructionsFactory(
       rpc,
       needsPriorityFees,
       supportsGetPriorityFeeEstimate,
+      supportsQNEstimatePriorityFees,
+      endpointUrl,
       enableClientSideRetries,
       sendAndConfirmTransaction,
     );
@@ -287,7 +291,7 @@ export const createKitePlugin = (config: KitePluginConfig = {}) => {
  *                 - A cluster name, from this list:
  *                   Public clusters (note these are rate limited, you should use a commercial RPC provider for production apps)
  *                     "mainnet", "testnet", "devnet", "localnet"
- *                   QuickNode:
+ *                   Quicknode:
  *                     "quicknode-mainnet", "quicknode-devnet", "quicknode-testnet"
  *                   Helius:
  *                     "helius-mainnet" or "helius-devnet" (Helius does not have testnet)
@@ -299,7 +303,7 @@ export const createKitePlugin = (config: KitePluginConfig = {}) => {
  *                 - WebSocket URL for subscriptions (required if using custom HTTP URL)
  *                 - A pre-configured RPC subscriptions client
  * @returns {Connection} Connection object with all helper functions configured
- * @throws {Error} If using QuickNode cluster without QUICKNODE_SOLANA_MAINNET_ENDPOINT or QUICKNODE_SOLANA_DEVNET_ENDPOINT or QUICKNODE_SOLANA_TESTNET_ENDPOINT environment variable set
+ * @throws {Error} If using Quicknode cluster without QUICKNODE_SOLANA_MAINNET_ENDPOINT or QUICKNODE_SOLANA_DEVNET_ENDPOINT or QUICKNODE_SOLANA_TESTNET_ENDPOINT environment variable set
  * @throws {Error} If using Helius cluster without HELIUS_API_KEY environment variable set
  * @throws {Error} If using Triton cluster without TRITON_SOLANA_MAINNET_ENDPOINT or TRITON_SOLANA_DEVNET_ENDPOINT or TRITON_SOLANA_TESTNET_ENDPOINT environment variable set
  * @throws {Error} If using custom HTTP URL without WebSocket URL
@@ -326,6 +330,7 @@ export const connect = (
     // Fall back to the original direct implementation for this case
     const rpcSubscriptions = clusterWebSocketURLOrRpcSubscriptions;
     const supportsGetPriorityFeeEstimate = false;
+    const supportsQNEstimatePriorityFees = false;
     const needsPriorityFees = false;
     const enableClientSideRetries = false;
 
@@ -340,6 +345,8 @@ export const connect = (
       rpc,
       needsPriorityFees,
       supportsGetPriorityFeeEstimate,
+      supportsQNEstimatePriorityFees,
+      null,
       enableClientSideRetries,
       sendAndConfirmTransaction,
     );

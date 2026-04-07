@@ -28,9 +28,82 @@ import {
 import { getAbortablePromise } from "@solana/promises";
 import { DEFAULT_TRANSACTION_RETRIES, DEFAULT_TRANSACTION_TIMEOUT, SECONDS } from "./constants";
 
+const getRecentPrioritizationFeeMedian = async (
+  rpc: ReturnType<typeof createSolanaRpcFromTransport>,
+  accountKeys: readonly string[],
+  abortSignal: AbortSignal | null,
+): Promise<number> => {
+  const recentFeesResponse = await rpc.getRecentPrioritizationFees([...accountKeys]).send({ abortSignal });
+  // @ts-expect-error TODO: typing error from original helius-smart-transactions-web3js2. Fix this.
+  const recentFeesValues = recentFeesResponse.reduce((accumulator, current) => {
+    if (current.prioritizationFee > 0n) {
+      return [...accumulator, current.prioritizationFee];
+    } else {
+      return accumulator;
+    }
+  }, []);
+
+  // @ts-expect-error TODO: typing error from original helius-smart-transactions-web3js2. Fix this.
+  recentFeesValues.sort((a, b) => Number(a - b));
+  return Number(recentFeesValues[Math.floor(recentFeesValues.length / 2)]);
+};
+
+const getQuicknodePriorityFeeEstimate = async (
+  endpointUrl: string,
+  accountKeys: readonly string[],
+  abortSignal: AbortSignal | null,
+): Promise<number> => {
+  const params: Record<string, unknown> = {
+    last_n_blocks: 100,
+    api_version: 2,
+  };
+
+  if (accountKeys[0]) {
+    params.account = accountKeys[0];
+  }
+
+  const response = await fetch(endpointUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "qn_estimatePriorityFees",
+      params,
+    }),
+    signal: abortSignal ?? undefined,
+  });
+
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`Quicknode RPC error ${response.status}: ${text.slice(0, 200)}`);
+  }
+
+  const data = JSON.parse(text) as {
+    result?: {
+      recommended?: number;
+      per_compute_unit?: { recommended?: number; medium?: number };
+    };
+    error?: { code: number; message: string };
+  };
+
+  if (data.error) {
+    throw new Error(`Quicknode method error ${data.error.code}: ${data.error.message}`);
+  }
+
+  return (
+    data.result?.recommended ??
+    data.result?.per_compute_unit?.recommended ??
+    data.result?.per_compute_unit?.medium ??
+    0
+  );
+};
+
 export const getPriorityFeeEstimate = async (
   rpc: ReturnType<typeof createSolanaRpcFromTransport>,
   supportsGetPriorityFeeEstimate: boolean,
+  supportsQNEstimatePriorityFees: boolean,
+  qnEndpointUrl: string | null,
   transactionMessage: TransactionMessage,
   abortSignal: AbortSignal | null = null,
 ): Promise<number> => {
@@ -44,22 +117,17 @@ export const getPriorityFeeEstimate = async (
     ]),
   ];
 
+  if (supportsQNEstimatePriorityFees && qnEndpointUrl) {
+    try {
+      return await getQuicknodePriorityFeeEstimate(qnEndpointUrl, accountKeys, abortSignal);
+    } catch {
+      return getRecentPrioritizationFeeMedian(rpc, accountKeys, abortSignal);
+    }
+  }
+
   // If the RPC doesn't support getPriorityFeeEstimate, use the median of the recent fees
   if (!supportsGetPriorityFeeEstimate) {
-    const recentFeesResponse = await rpc.getRecentPrioritizationFees([...accountKeys]).send({ abortSignal });
-    // @ts-expect-error TODO: typing error from original helius-smart-transactions-web3js2. Fix this.
-    const recentFeesValues = recentFeesResponse.reduce((accumulator, current) => {
-      if (current.prioritizationFee > 0n) {
-        return [...accumulator, current.prioritizationFee];
-      } else {
-        return accumulator;
-      }
-    }, []);
-
-    // Return the median fee
-    // @ts-expect-error TODO: typing error from original helius-smart-transactions-web3js2. Fix this.
-    recentFeesValues.sort((a, b) => Number(a - b));
-    return Number(recentFeesValues[Math.floor(recentFeesValues.length / 2)]);
+    return getRecentPrioritizationFeeMedian(rpc, accountKeys, abortSignal);
   }
   // Get a priority fee estimate, using Helius' `getPriorityFeeEstimate` method on Helius mainnet
 

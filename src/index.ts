@@ -47,47 +47,47 @@ export { getPDAAndBump } from "./lib/pdas";
 // This type is used in the Connection interface and connect function signatures, so it needs to be available in the generated .d.ts files
 export type { RpcTransport } from "@solana/kit";
 
-// ── QuickNode Add-on factories ────────────────────────────────────────────────
+// ── Quicknode Add-on factories ────────────────────────────────────────────────
 export {
-  // Priority Fee API (FREE)
+  // Priority Fee API
   getQuickNodePriorityFeesFactory,
-  // Metaplex DAS API (FREE)
+  // Metaplex DAS API
   getAssetsByOwnerFactory,
   getAssetFactory,
   getAssetsByCollectionFactory,
   searchAssetsFactory,
   getAssetProofFactory,
   getWalletTokenAccountsFactory,
-  // OpenOcean V4 Swap API (FREE)
+  // OpenOcean V4 Swap API
   getOpenOceanQuoteFactory,
   getOpenOceanSwapTransactionFactory,
   OPENOCEAN_TOKENS,
-  // Solana MEV Protection by Merkle (FREE)
+  // Solana MEV Protection by Merkle
   sendMerkleTransactionFactory,
-  // Solana MEV Resilience by Blink Labs (FREE)
+  // Solana MEV Resilience by Blink Labs
   sendBlinkLabsTransactionFactory,
-  // Multi-Chain Stablecoin Balance API (PAID)
+  // Multi-Chain Stablecoin Balance API
   getStablecoinBalancesFactory,
-  // Metis — Jupiter V6 Swap API (PAID)
+  // Metis — Jupiter V6 Swap API
   getJupiterSwapQuoteFactory,
   getJupiterSwapTransactionFactory,
   getPumpFunSwapTransactionFactory,
-  // Lil' JIT — JITO Bundles & Transactions (PAID)
+  // Lil' JIT — JITO Bundles & Transactions
   sendJitoTransactionFactory,
   sendJitoBundleFactory,
   getBundleStatusesFactory,
   getInflightBundleStatusesFactory,
   getJitoTipAccountsFactory,
   getJitoTipFloorFactory,
-  // Iris Transaction Sender by Astralane (PAID)
+  // Iris Transaction Sender by Astralane
   sendIrisTransactionFactory,
-  // GoldRush — Multichain Data APIs by Covalent (PAID)
+  // GoldRush — Multichain Data APIs by Covalent
   getGoldRushBalancesFactory,
   getGoldRushTransactionsFactory,
-  // DeFi Swap Meta-Aggregation by Titan (PAID)
+  // DeFi Swap Meta-Aggregation by Titan
   getTitanSwapQuoteFactory,
   subscribeTitanQuotesFactory,
-  // Risk Assessment API by Scorechain (PAID)
+  // Risk Assessment API by Scorechain
   assessWalletRiskFactory,
 } from "./lib/quicknode";
 export type {
